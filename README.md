@@ -1,4 +1,4 @@
-# Streaming Data Analysis Workflow using AWS Kinesis AWS Data Analytics
+# Streaming Data Analysis Workflow with Amazon Kinesis Data Analytics
 AMD stock analysis using AWS Kinesis Data Analytics Studio
 
 # Stock Price Data
