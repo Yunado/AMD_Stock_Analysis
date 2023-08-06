@@ -1,0 +1,629 @@
+﻿{
+  "paragraphs": [
+    {
+      "text": "%flink.ssql(type=update)\r\n\r\nDROP TABLE IF EXISTS stock_table;\r\n\r\n-- create a table to glue data catalog table with columns for stock data, \r\n-- sets a watermark to trigger late arrival events, and configures it to read \r\n-- from a Kinesis stream, in JSON format with an ISO-8601 timestamp format.\r\nCREATE TABLE stock_table(\r\n    `date` STRING,\r\n    ticker VARCHAR(6),\r\n    open_price FLOAT,\r\n    high FLOAT,\r\n    low FLOAT,\r\n    close_price FLOAT,\r\n    adjclose FLOAT,\r\n    volume BIGINT,\r\n    event_time TIMESTAMP(3),\r\n    WATERMARK FOR event_time as event_time - INTERVAL '5' SECOND\r\n) WITH ( --connect to your kinesis data stream\r\n    'connector' = 'kinesis', \r\n    'stream' = 'mp11v2_ds',\r\n    'aws.region' = 'us-east-1',\r\n    'scan.stream.initpos' = 'TRIM_HORIZON',\r\n    'format' = 'json',\r\n    'json.timestamp-format.standard' = 'ISO-8601'\r\n);",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T17:03:01+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "sql",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/sql",
+        "fontSize": 9,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683873279257_806777552",
+      "id": "paragraph_1683873279257_806777552",
+      "dateCreated": "2023-05-12T06:34:39+0000",
+      "dateStarted": "2023-05-12T17:03:01+0000",
+      "dateFinished": "2023-05-12T17:03:04+0000",
+      "status": "FINISHED",
+      "focus": true,
+      "$$hashKey": "object:18928",
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "Table has been dropped.\nTable has been created.\n"
+          }
+        ]
+      }
+    },
+    {
+      "text": "%flink.pyflink\r\n\r\nfrom pyflink.datastream import StreamExecutionEnvironment\r\nfrom pyflink.table import StreamTableEnvironment, DataTypes\r\nfrom pyflink.table.udf import udf\r\nfrom datetime import datetime\r\n\r\n# Unregister the existing function if it exists\r\nst_env.execute_sql(\"DROP TEMPORARY FUNCTION IF EXISTS calculate_cmgr\")\r\n    \r\n# Define the custom function\r\n@udf(result_type=DataTypes.FLOAT(), input_types=[DataTypes.STRING(), DataTypes.FLOAT()])\r\ndef calculate_cmgr(date_string: str, close_price: float) -> float:\r\n    start_date = datetime.strptime(\"01/04/2021\", \"%m/%d/%Y\").date()\r\n    current_date = datetime.strptime(date_string, '%m/%d/%Y').date()\r\n    \r\n    # Check if the day is within the first three days of the month and not January 2021\r\n    if current_date.day <= 3 and not (current_date.month == 1 and current_date.year == 2021):\r\n        # Compute the number of months between the start date and the current date\r\n        number_of_months = (current_date.year - start_date.year) * 12 + (current_date.month - start_date.month)\r\n        \r\n        # Calculate the CMGR\r\n        cmgr = ((close_price / 92.3) ** (1 / number_of_months) - 1) * 100\r\n        return cmgr\r\n    else:\r\n        return 0.0\r\n\r\n# Register the custom function with a name\r\nst_env.create_temporary_function(\"calculate_cmgr\", calculate_cmgr)\r\n",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T17:03:08+0000",
+      "progress": 0,
+      "config": {
+        "colWidth": 12,
+        "fontSize": 9,
+        "enabled": true,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "table",
+              "height": 300,
+              "optionOpen": false
+            },
+            "helium": {}
+          }
+        },
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/python"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683873395692_328144860",
+      "id": "paragraph_1683873395692_328144860",
+      "dateCreated": "2023-05-12T06:36:35+0000",
+      "dateStarted": "2023-05-12T17:03:08+0000",
+      "dateFinished": "2023-05-12T17:03:09+0000",
+      "status": "FINISHED",
+      "$$hashKey": "object:18929",
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      }
+    },
+    {
+      "text": "%flink.ssql(type=update)\n\nSELECT event_time, calculate_cmgr(`date`, close_price) AS cmgr, `date`, close_price\nFROM stock_table\nWHERE calculate_cmgr(`date`, close_price) <> 0.0",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T20:54:06+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "sql",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/sql",
+        "fontSize": 9,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "stackedAreaChart",
+              "height": 300,
+              "optionOpen": true,
+              "setting": {
+                "table": {
+                  "tableOptionValue": {
+                    "useFilter": false
+                  },
+                  "tableGridState": {
+                    "columns": [
+                      {
+                        "name": "event_time0",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "cmgr1",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "date2",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "close_price3",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      }
+                    ],
+                    "scrollFocus": {},
+                    "selection": [],
+                    "grouping": {
+                      "grouping": [],
+                      "aggregations": [],
+                      "rowExpandedStates": {}
+                    },
+                    "treeView": {},
+                    "pagination": {
+                      "paginationCurrentPage": 1,
+                      "paginationPageSize": 250
+                    }
+                  }
+                },
+                "lineChart": {
+                  "xLabelStatus": "default"
+                },
+                "stackedAreaChart": {
+                  "rotate": {
+                    "degree": "-45"
+                  },
+                  "xLabelStatus": "default",
+                  "style": "stack"
+                }
+              },
+              "commonSetting": {},
+              "keys": [
+                {
+                  "name": "date",
+                  "index": 2,
+                  "aggr": "sum"
+                }
+              ],
+              "groups": [],
+              "values": [
+                {
+                  "name": "cmgr",
+                  "index": 1,
+                  "aggr": "sum"
+                }
+              ]
+            },
+            "helium": {}
+          },
+          "2": {
+            "graph": {
+              "mode": "table",
+              "height": 300,
+              "optionOpen": false,
+              "setting": {
+                "table": {
+                  "tableGridState": {},
+                  "tableColumnTypeState": {
+                    "names": {
+                      "low": "string",
+                      "high": "string",
+                      "event_time": "string",
+                      "avg_price": "string"
+                    },
+                    "updated": false
+                  },
+                  "tableOptionSpecHash": "[{\"name\":\"useFilter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable filter for columns\"},{\"name\":\"showPagination\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable pagination for better navigation\"},{\"name\":\"showAggregationFooter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable a footer for displaying aggregated values\"}]",
+                  "tableOptionValue": {
+                    "useFilter": false,
+                    "showPagination": false,
+                    "showAggregationFooter": false
+                  },
+                  "updated": false,
+                  "initialized": false
+                }
+              },
+              "commonSetting": {}
+            }
+          }
+        },
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "FLINK JOB",
+          "tooltip": "View in Flink web UI",
+          "group": "flink",
+          "values": [
+            {
+              "jobUrl": "/flinkdashboard/#/job/463ea03433fc8141a8954b29ad6fc2b4",
+              "$$hashKey": "object:84654"
+            }
+          ],
+          "interpreterSettingId": "flink"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683904724524_404457566",
+      "id": "paragraph_1683904724524_404457566",
+      "dateCreated": "2023-05-12T15:18:44+0000",
+      "dateStarted": "2023-05-12T20:53:18+0000",
+      "dateFinished": "2023-05-12T20:54:06+0000",
+      "status": "ABORT",
+      "$$hashKey": "object:18930",
+      "results": {
+        "code": "ERROR",
+        "msg": [
+          {
+            "type": "TABLE",
+            "data": "event_time\tcmgr\tdate\tclose_price\n2023-05-12 17:02:08.983\t-5.0270815\t2/1/2021\t87.66\n2023-05-12 17:02:09.017\t-3.7269766\t2/2/2021\t88.86\n2023-05-12 17:02:09.037\t-4.777899\t2/3/2021\t87.89\n2023-05-12 17:02:09.677\t-3.254475\t3/1/2021\t86.39\n2023-05-12 17:02:09.717\t-4.528315\t3/2/2021\t84.13\n2023-05-12 17:02:09.737\t-6.402118\t3/3/2021\t80.86\n2023-05-12 17:02:10.537\t-4.2243314\t4/1/2021\t81.09\n2023-05-12 17:02:11.317\t-3.9524865\t5/3/2021\t78.55\n2023-05-12 17:02:12.057\t-2.6238322\t6/1/2021\t80.81\n2023-05-12 17:02:12.077\t-2.3458626\t6/2/2021\t81.97\n2023-05-12 17:02:12.117\t-2.7518985\t6/3/2021\t80.28\n2023-05-12 17:02:12.857\t0.18154986\t7/1/2021\t93.31\n2023-05-12 17:02:12.877\t0.42874694\t7/2/2021\t94.7\n2023-05-12 17:02:13.617\t2.3544824\t8/2/2021\t108.63\n2023-05-12 17:02:13.657\t2.8754547\t8/3/2021\t112.56\n2023-05-12 17:02:14.457\t2.216013\t9/1/2021\t109.99\n2023-05-12 17:02:14.497\t2.1239526\t9/2/2021\t109.2\n2023-05-12 17:02:14.537\t2.207879\t9/3/2021\t109.92\n2023-05-12 17:02:15.237\t1.1659751\t10/1/2021\t102.45\n2023-05-12 17:02:16.017\t3.0981019\t11/1/2021\t125.23\n2023-05-12 17:02:16.058\t3.2940025\t11/2/2021\t127.63\n2023-05-12 17:02:16.097\t3.5263407\t11/3/2021\t130.53\n2023-05-12 17:02:16.857\t4.4568257\t12/1/2021\t149.11\n2023-05-12 17:02:16.897\t4.5563354\t12/2/2021\t150.68\n2023-05-12 17:02:16.962\t4.1268697\t12/3/2021\t144.01\n2023-05-12 17:02:17.717\t4.1434574\t1/3/2022\t150.24\n2023-05-12 17:02:18.477\t1.82607\t2/1/2022\t116.78\n2023-05-12 17:02:18.537\t2.2179866\t2/2/2022\t122.76\n2023-05-12 17:02:18.557\t2.0445752\t2/3/2022\t120.08\n2023-05-12 17:02:19.217\t1.5088556\t3/1/2022\t113.83\n2023-05-12 17:02:19.278\t1.7872881\t3/2/2022\t118.28\n2023-05-12 17:02:19.297\t1.3901176\t3/3/2022\t111.98\n2023-05-12 17:02:20.09\t1.0645924\t4/1/2022\t108.19\n2023-05-12 17:02:20.837\t-0.16869424\t5/2/2022\t89.84\n2023-05-12 17:02:20.877\t-0.07970018\t5/3/2022\t91.13\n2023-05-12 17:02:21.617\t0.5441353\t6/1/2022\t101.22\n2023-05-12 17:02:21.657\t0.9606742\t6/2/2022\t108.59\n2023-05-12 17:02:21.697\t0.8341728\t6/3/2022\t106.3\n2023-05-12 17:02:22.397\t-1.2446806\t7/1/2022\t73.67\n2023-05-12 17:02:23.137\t0.24976511\t8/1/2022\t96.78\n2023-05-12 17:02:23.177\t0.3849534\t8/2/2022\t99.29\n2023-05-12 17:02:23.217\t0.32073033\t8/3/2022\t98.09\n2023-05-12 17:02:24.017\t-0.5699126\t9/1/2022\t82.33\n2023-05-12 17:02:24.057\t-0.69766504\t9/2/2022\t80.24\n2023-05-12 17:02:24.777\t-1.5766019\t10/3/2022\t66.11\n2023-05-12 17:02:25.577\t-1.9640131\t11/1/2022\t59.66\n2023-05-12 17:02:25.597\t-2.0415878\t11/2/2022\t58.63\n2023-05-12 17:02:25.637\t-1.9305217\t11/3/2022\t60.11\n2023-05-12 17:02:26.337\t-0.758087\t12/1/2022\t77.48\n2023-05-12 17:02:26.377\t-0.8995069\t12/2/2022\t74.98\n"
+          },
+          {
+            "type": "TEXT",
+            "data": "Fail to run sql command: SELECT event_time, calculate_cmgr(`date`, close_price) AS cmgr, `date`, close_price\nFROM stock_table\nWHERE calculate_cmgr(`date`, close_price) <> 0.0\n"
+          },
+          {
+            "type": "ANGULAR",
+            "data": "<div class='container ng-scope' style='padding-left:0px;padding-right:0px;'>\n    <div class='panel panel-danger'>\n        <div class='panel-heading' ng-click='isOpen=!isOpen' ng-init='isOpen=false' style=\"cursor:pointer\">\n            <div class='plainTextContainer' style='font-weight:bolder'><i class=\"fa fa-caret-right fa-fw\" style=\"padding-right:7px;transition:all 0.3s;{{isOpen?'transform:rotate(90deg);transform-origin:25% 45%':''}}\"></i>Job was cancelled.</div>\n        </div>\n        <div class='panel-collapse' uib-collapse='!isOpen'>\n            <div class='text' style='max-height:300px;overflow:auto;padding:10px'>java.io.IOException: Fail to run stream sql job\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:172)\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:105)\n\tat org.apache.zeppelin.flink.FlinkStreamSqlInterpreter.callInnerSelect(FlinkStreamSqlInterpreter.java:89)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callSelect(FlinkSqlInterrpeter.java:503)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callCommand(FlinkSqlInterrpeter.java:266)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.runSqlList(FlinkSqlInterrpeter.java:160)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.internalInterpret(FlinkSqlInterrpeter.java:112)\n\tat org.apache.zeppelin.interpreter.AbstractInterpreter.interpret(AbstractInterpreter.java:47)\n\tat org.apache.zeppelin.interpreter.LazyOpenInterpreter.interpret(LazyOpenInterpreter.java:110)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:852)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:744)\n\tat org.apache.zeppelin.scheduler.Job.run(Job.java:172)\n\tat org.apache.zeppelin.scheduler.AbstractScheduler.runJob(AbstractScheduler.java:132)\n\tat org.apache.zeppelin.scheduler.ParallelScheduler.lambda$runJobInScheduler$0(ParallelScheduler.java:46)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)\n\tat java.base/java.lang.Thread.run(Thread.java:829)\nCaused by: org.apache.flink.client.program.ProgramInvocationException: Job failed (JobID: 463ea03433fc8141a8954b29ad6fc2b4)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:125)\n\tat java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:642)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.client.program.rest.RestClusterClient.lambda$pollResourceAsync$24(RestClusterClient.java:670)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.postFire(CompletableFuture.java:610)\n\tat java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1085)\n\tat java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:478)\n\t... 3 more\nCaused by: org.apache.flink.runtime.client.JobCancellationException: Job was cancelled.\n\tat org.apache.flink.runtime.jobmaster.JobResult.toJobExecutionResult(JobResult.java:146)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:123)\n\t... 23 more\n</div>\n        </div>\n    </div>\n</div>\n"
+          }
+        ]
+      }
+    },
+    {
+      "text": "%flink.pyflink\n\nfrom pyflink.datastream import StreamExecutionEnvironment\nfrom pyflink.table import StreamTableEnvironment, DataTypes\nfrom pyflink.table.udf import udf\n\n# Unregister the existing function if it exists\nst_env.execute_sql(\"DROP TEMPORARY FUNCTION IF EXISTS calculate_ema\")\n\n# Define the EMA calculation function\n@udf(result_type=DataTypes.FLOAT(), input_types=[DataTypes.FLOAT(), DataTypes.FLOAT()])\ndef calculate_ema(prev_ema: float, current_price: float) -> float:\n    return \n\n# Register the EMA calculation function\nst_env.register_function(\"calculate_ema\", calculate_ema)",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T20:31:33+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "python",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/python",
+        "fontSize": 9,
+        "results": {},
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {},
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683921739029_1862275652",
+      "id": "paragraph_1683921739029_1862275652",
+      "dateCreated": "2023-05-12T20:02:19+0000",
+      "status": "FINISHED",
+      "focus": true,
+      "$$hashKey": "object:65031",
+      "dateFinished": "2023-05-12T20:21:33+0000",
+      "dateStarted": "2023-05-12T20:21:32+0000",
+      "results": {
+        "code": "SUCCESS",
+        "msg": []
+      }
+    },
+    {
+      "text": "%flink.ssql(type=update)\r\n\r\nSELECT *\r\nFROM (\r\n    SELECT \r\n    event_time,\r\n    ticker,\r\n    close_price,\r\n    sma as avg_close_price,\r\n    ((close_price - emaprev) * (2.0/11.0) + emaprev) AS ema_close_price,\r\n    `date`\r\n    FROM (\r\n        SELECT \r\n            event_time,\r\n            ticker,\r\n            close_price,\r\n            sma,\r\n            (close_price - LAG(sma, 1) OVER (ORDER BY event_time)) * (2.0/11.0) + LAG(sma, 1) OVER (ORDER BY event_time) as emaprev,\r\n            `date`\r\n        FROM (\r\n            SELECT\r\n                event_time,\r\n                ticker,\r\n                close_price,\r\n                AVG(close_price) OVER (\r\n                  PARTITION BY ticker\r\n                  ORDER BY event_time\r\n                  ROWS BETWEEN 9 PRECEDING AND CURRENT ROW\r\n                ) AS sma,\r\n                `date`\r\n            FROM stock_table\r\n        ) t\r\n    ) t1\r\n) t2\r\nWHERE close_price < ema_close_price;",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T22:12:40+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "sql",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/sql",
+        "fontSize": 9,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "lineChart",
+              "height": 300,
+              "optionOpen": true,
+              "setting": {
+                "lineChart": {
+                  "rotate": {
+                    "degree": "-45"
+                  },
+                  "xLabelStatus": "default",
+                  "lineWithFocus": false
+                },
+                "table": {
+                  "tableGridState": {},
+                  "tableColumnTypeState": {
+                    "names": {
+                      "event_time": "string",
+                      "ticker": "string",
+                      "close_price": "string",
+                      "date": "string",
+                      "avg_close_price": "string"
+                    },
+                    "updated": false
+                  },
+                  "tableOptionSpecHash": "[{\"name\":\"useFilter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable filter for columns\"},{\"name\":\"showPagination\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable pagination for better navigation\"},{\"name\":\"showAggregationFooter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable a footer for displaying aggregated values\"}]",
+                  "tableOptionValue": {
+                    "useFilter": false,
+                    "showPagination": false,
+                    "showAggregationFooter": false
+                  },
+                  "updated": false,
+                  "initialized": false
+                },
+                "stackedAreaChart": {
+                  "xLabelStatus": "default"
+                }
+              },
+              "commonSetting": {},
+              "keys": [
+                {
+                  "name": "date",
+                  "index": 5,
+                  "aggr": "sum"
+                }
+              ],
+              "groups": [],
+              "values": [
+                {
+                  "name": "ema_close_price",
+                  "index": 4,
+                  "aggr": "sum"
+                },
+                {
+                  "name": "close_price",
+                  "index": 2,
+                  "aggr": "sum"
+                }
+              ]
+            },
+            "helium": {}
+          }
+        },
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "FLINK JOB",
+          "tooltip": "View in Flink web UI",
+          "group": "flink",
+          "values": [
+            {
+              "jobUrl": "/flinkdashboard/#/job/6826597506541a72f08b26971d583f91",
+              "$$hashKey": "object:129798"
+            }
+          ],
+          "interpreterSettingId": "flink"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683906875635_575363179",
+      "id": "paragraph_1683906875635_575363179",
+      "dateCreated": "2023-05-12T15:54:35+0000",
+      "status": "ABORT",
+      "$$hashKey": "object:18931",
+      "dateFinished": "2023-05-12T21:01:03+0000",
+      "dateStarted": "2023-05-12T20:59:35+0000",
+      "results": {
+        "code": "ERROR",
+        "msg": [
+          {
+            "type": "TABLE",
+            "data": "event_time\tticker\tclose_price\tavg_close_price\tema_close_price\tdate\n2023-05-12 17:02:08.343\tAMD\t90.33\t91.80001\t91.80607816589355\t1/6/2021\n2023-05-12 17:02:08.537\tAMD\t91.78\t93.69125\t93.24220833593749\t1/13/2021\n2023-05-12 17:02:08.577\tAMD\t90.79\t93.36889\t92.73216204751586\t1/14/2021\n2023-05-12 17:02:08.597\tAMD\t88.21\t92.853004\t91.66347258055114\t1/15/2021\n2023-05-12 17:02:08.637\tAMD\t89.45\t92.56801\t91.72804442108153\t1/19/2021\n2023-05-12 17:02:08.677\tAMD\t88.75\t92.166\t91.30585814025879\t1/20/2021\n2023-05-12 17:02:08.717\tAMD\t91.53\t92.285995\t91.95575249629212\t1/21/2021\n2023-05-12 17:02:08.857\tAMD\t88.84\t91.098\t90.78801129911805\t1/27/2021\n2023-05-12 17:02:08.897\tAMD\t87.52\t90.672\t89.9151893652954\t1/28/2021\n2023-05-12 17:02:08.943\tAMD\t85.64\t90.157\t89.00852855223084\t1/29/2021\n2023-05-12 17:02:08.983\tAMD\t87.66\t90.102005\t89.33154518136597\t2/1/2021\n2023-05-12 17:02:09.017\tAMD\t88.86\t90.043\t89.69142608085633\t2/2/2021\n2023-05-12 17:02:09.037\tAMD\t87.89\t89.957\t89.33126486079406\t2/3/2021\n2023-05-12 17:02:09.077\tAMD\t87.84\t89.588\t89.25716539488221\t2/4/2021\n2023-05-12 17:02:09.117\tAMD\t87.9\t89.09901\t89.02998269136047\t2/5/2021\n2023-05-12 17:02:09.377\tAMD\t89.94\t90.619\t90.32224223199462\t2/17/2021\n2023-05-12 17:02:09.417\tAMD\t88.64\t90.69401\t89.9647875305481\t2/18/2021\n2023-05-12 17:02:09.457\tAMD\t89.58\t90.86801\t90.32574152926635\t2/19/2021\n2023-05-12 17:02:09.477\tAMD\t85.37\t90.615005\t89.0504889890442\t2/22/2021\n2023-05-12 17:02:09.517\tAMD\t84.74\t89.942\t88.67285627897644\t2/23/2021\n2023-05-12 17:02:09.559\tAMD\t86.94\t89.545\t88.94960537361145\t2/24/2021\n2023-05-12 17:02:09.597\tAMD\t82.42\t88.552\t87.18962887570191\t2/25/2021\n2023-05-12 17:02:09.637\tAMD\t84.51\t87.737\t87.21580500274658\t2/26/2021\n2023-05-12 17:02:09.677\tAMD\t86.39\t86.999\t87.29171103877258\t3/1/2021\n2023-05-12 17:02:09.717\tAMD\t84.13\t86.266\t86.05057065612793\t3/2/2021\n2023-05-12 17:02:09.737\tAMD\t80.86\t85.357994\t84.47889402676392\t3/3/2021\n2023-05-12 17:02:09.777\tAMD\t77.75\t84.269\t82.84295697726441\t3/4/2021\n2023-05-12 17:02:09.817\tAMD\t78.52\t83.162994\t82.36850304351806\t3/5/2021\n2023-05-12 17:02:09.857\tAMD\t73.96\t82.021996\t80.12068480500794\t3/8/2021\n2023-05-12 17:02:09.897\tAMD\t78.53\t81.401\t80.86761798121644\t3/9/2021\n2023-05-12 17:02:09.937\tAMD\t77.52\t80.459\t80.11802524205018\t3/10/2021\n2023-05-12 17:02:10.157\tAMD\t78.12\t79.681\t79.14019825770569\t3/18/2021\n2023-05-12 17:02:10.177\tAMD\t79.06\t79.735\t79.4757096002655\t3/19/2021\n2023-05-12 17:02:10.257\tAMD\t78.38\t80.35399\t79.71147568304443\t3/23/2021\n2023-05-12 17:02:10.297\tAMD\t76.48\t80.249985\t79.07333363372803\t3/24/2021\n2023-05-12 17:02:10.337\tAMD\t76.22\t79.748985\t78.9177606206665\t3/25/2021\n2023-05-12 17:02:10.377\tAMD\t77.41\t79.38499\t78.97576912260436\t3/26/2021\n2023-05-12 17:02:10.397\tAMD\t77.14\t78.84898\t78.6428431216278\t3/29/2021\n2023-05-12 17:02:10.488\tAMD\t76.0\t78.17399\t77.907172017807\t3/30/2021\n2023-05-12 17:02:10.757\tAMD\t78.58\t80.24898\t79.61893098291016\t4/12/2021\n2023-05-12 17:02:10.797\tAMD\t80.19\t80.55398\t80.22948110969544\t4/13/2021\n2023-05-12 17:02:10.837\tAMD\t78.55\t80.808975\t79.89150720433045\t4/14/2021\n2023-05-12 17:02:10.957\tAMD\t81.11\t81.33398\t81.2813596704712\t4/19/2021\n2023-05-12 17:02:10.977\tAMD\t79.27\t81.11698\t80.6516695776825\t4/20/2021\n2023-05-12 17:02:11.057\tAMD\t79.06\t80.62898\t80.39748726049805\t4/22/2021\n2023-05-12 17:02:11.277\tAMD\t81.62\t82.39797\t82.17627258027649\t4/30/2021\n2023-05-12 17:02:11.317\tAMD\t78.55\t82.141975\t81.12591749298095\t5/3/2021\n2023-05-12 17:02:11.357\tAMD\t78.61\t82.07597\t80.97438096717835\t5/4/2021\n2023-05-12 17:02:11.397\tAMD\t77.83\t81.697975\t80.67234803892518\t5/5/2021\n2023-05-12 17:02:11.437\tAMD\t77.89\t81.58098\t80.43914157865906\t5/6/2021\n2023-05-12 17:02:11.477\tAMD\t78.81\t81.185974\t80.66495258728028\t5/7/2021\n2023-05-12 17:02:11.497\tAMD\t75.99\t80.24397\t79.46829811549378\t5/10/2021\n2023-05-12 17:02:11.537\tAMD\t76.83\t79.40597\t79.11538809147643\t5/11/2021\n2023-05-12 17:02:11.577\tAMD\t74.64\t78.46797\t77.83044244355774\t5/12/2021\n2023-05-12 17:02:11.617\tAMD\t73.09\t77.38596\t76.69013045104981\t5/13/2021\n2023-05-12 17:02:11.657\tAMD\t74.59\t76.68296\t76.46167708839417\t5/14/2021\n2023-05-12 17:02:11.697\tAMD\t74.65\t76.29296\t76.01090862548828\t5/17/2021\n2023-05-12 17:02:11.717\tAMD\t74.44\t75.87596\t75.6804129050293\t5/18/2021\n2023-05-12 17:02:12.245\tAMD\t79.96\t80.367966\t80.09251826501465\t6/9/2021\n2023-05-12 17:02:12.417\tAMD\t80.47\t81.09196\t80.90911470770263\t6/15/2021\n2023-05-12 17:02:12.457\tAMD\t80.11\t80.90596\t80.76734332554626\t6/16/2021\n2023-05-12 17:02:12.997\tAMD\t89.74\t90.500946\t89.85309814489746\t7/8/2021\n2023-05-12 17:02:13.077\tAMD\t90.81\t91.499954\t90.92443645233155\t7/12/2021\n2023-05-12 17:02:13.097\tAMD\t90.26\t91.81795\t91.09005362145996\t7/13/2021\n2023-05-12 17:02:13.137\tAMD\t89.05\t91.77095\t90.90292588616944\t7/14/2021\n2023-05-12 17:02:13.177\tAMD\t86.93\t91.070946\t90.1706378640747\t7/15/2021\n2023-05-12 17:02:13.217\tAMD\t85.89\t90.32895\t89.35823715859985\t7/16/2021\n2023-05-12 17:02:13.257\tAMD\t86.58\t89.51695\t89.08962859194946\t7/19/2021\n2023-05-12 17:02:13.297\tAMD\t87.11\t88.780945\t88.72126710871888\t7/20/2021\n2023-05-12 17:02:13.837\tAMD\t106.48\t108.35494\t106.70087790559387\t8/10/2021\n2023-05-12 17:02:13.877\tAMD\t107.68\t109.32994\t108.13182159541321\t8/11/2021\n2023-05-12 17:02:13.917\tAMD\t106.5\t109.68494\t108.39442398683165\t8/12/2021\n2023-05-12 17:02:14.003\tAMD\t107.48\t110.005936\t109.24790001521302\t8/16/2021\n2023-05-12 17:02:14.044\tAMD\t107.56\t109.505936\t109.19736214779662\t8/17/2021\n2023-05-12 17:02:14.077\tAMD\t103.44\t107.97292\t107.50067061766052\t8/18/2021\n2023-05-12 17:02:14.117\tAMD\t103.7\t107.107925\t106.56038668309021\t8/19/2021\n2023-05-12 17:02:14.177\tAMD\t104.65\t106.56193\t106.29538877418518\t8/20/2021\n2023-05-12 17:02:14.577\tAMD\t109.15\t109.49193\t109.3534602389679\t9/7/2021\n2023-05-12 17:02:14.617\tAMD\t106.17\t109.34393\t108.39377079586792\t9/8/2021\n2023-05-12 17:02:14.657\tAMD\t106.15\t109.12893\t108.28808838050843\t9/9/2021\n2023-05-12 17:02:14.677\tAMD\t105.2\t108.92192\t107.830109247818\t9/10/2021\n2023-05-12 17:02:14.717\tAMD\t104.8\t108.261925\t107.55930395272827\t9/13/2021\n2023-05-12 17:02:14.757\tAMD\t105.73\t107.70293\t107.42492690122987\t9/14/2021\n2023-05-12 17:02:14.797\tAMD\t105.6\t107.19093\t107.0077438370514\t9/15/2021\n2023-05-12 17:02:14.837\tAMD\t106.22\t106.81393\t106.86996492057801\t9/16/2021\n2023-05-12 17:02:14.877\tAMD\t103.88\t106.28192\t105.84403325749206\t9/17/2021\n2023-05-12 17:02:14.917\tAMD\t101.55\t105.44492\t104.71765293145752\t9/20/2021\n2023-05-12 17:02:14.937\tAMD\t102.82\t104.81191\t104.5771805164032\t9/21/2021\n2023-05-12 17:02:14.977\tAMD\t104.38\t104.63291\t104.66913064149476\t9/22/2021\n2023-05-12 17:02:15.137\tAMD\t101.52\t104.60791\t103.86893856564332\t9/28/2021\n2023-05-12 17:02:15.181\tAMD\t100.35\t104.08291\t103.20033682350159\t9/29/2021\n2023-05-12 17:02:15.197\tAMD\t102.9\t103.750916\t103.69186509829713\t9/30/2021\n2023-05-12 17:02:15.237\tAMD\t102.45\t103.60791\t103.32086085929872\t10/1/2021\n2023-05-12 17:02:15.277\tAMD\t100.34\t103.486916\t102.52760839120482\t10/4/2021\n2023-05-12 17:02:15.317\tAMD\t101.81\t103.38591\t102.93256294892883\t10/5/2021\n2023-05-12 17:02:16.857\tAMD\t149.11\t154.62094\t153.02273059210205\t12/1/2021\n2023-05-12 17:02:16.897\tAMD\t150.68\t154.55496\t153.31814982907105\t12/2/2021\n2023-05-12 17:02:16.962\tAMD\t144.01\t153.45395\t151.06902592468262\t12/3/2021\n2023-05-12 17:02:16.977\tAMD\t139.06\t151.81894\t148.69562243411255\t12/6/2021\n2023-05-12 17:02:17.017\tAMD\t144.85\t151.05194\t149.51516121713254\t12/7/2021\n2023-05-12 17:02:17.057\tAMD\t145.24\t150.58394\t149.13064212460327\t12/8/2021\n2023-05-12 17:02:17.097\tAMD\t138.1\t148.61392\t146.45702289245605\t12/9/2021\n2023-05-12 17:02:17.157\tAMD\t138.55\t146.98795\t145.2870100518799\t12/10/2021\n2023-05-12 17:02:17.197\tAMD\t133.8\t144.17694\t142.62830025808717\t12/13/2021\n2023-05-12 17:02:17.217\tAMD\t135.6\t141.89993\t141.3415944102783\t12/14/2021\n2023-05-12 17:02:17.297\tAMD\t138.64\t140.43495\t140.64755903027344\t12/16/2021\n2023-05-12 17:02:17.337\tAMD\t137.75\t139.80894\t139.54736555599976\t12/17/2021\n2023-05-12 17:02:17.377\tAMD\t135.8\t139.48296\t138.48367580813598\t12/20/2021\n2023-05-12 17:02:17.677\tAMD\t143.9\t145.26396\t144.4609474871521\t12/31/2021\n2023-05-12 17:02:17.757\tAMD\t144.42\t147.37497\t145.82107890567016\t1/4/2022\n2023-05-12 17:02:17.797\tAMD\t136.15\t146.56497\t143.66423821890257\t1/5/2022\n2023-05-12 17:02:17.837\tAMD\t136.23\t145.79996\t143.14845478814698\t1/6/2022\n2023-05-12 17:02:17.858\tAMD\t132.0\t144.38596\t141.23799173349\t1/7/2022\n2023-05-12 17:02:17.897\tAMD\t132.0\t142.14996\t140.2914275453491\t1/10/2022\n2023-05-12 17:02:17.937\tAMD\t137.31\t140.56596\t140.5499755213318\t1/11/2022\n2023-05-12 17:02:17.978\tAMD\t137.47\t139.48697\t139.5425050739746\t1/12/2022\n2023-05-12 17:02:18.041\tAMD\t132.74\t138.24596\t137.2565690583496\t1/13/2022\n2023-05-12 17:02:18.057\tAMD\t136.88\t137.54396\t137.79440214056396\t1/14/2022\n2023-05-12 17:02:18.1\tAMD\t131.93\t135.71297\t135.68810527160645\t1/18/2022\n2023-05-12 17:02:18.137\tAMD\t128.27\t134.09796\t133.2524868687744\t1/19/2022\n2023-05-12 17:02:18.177\tAMD\t121.89\t132.67197\t130.06227376669312\t1/20/2022\n2023-05-12 17:02:18.217\tAMD\t118.81\t130.92996\t128.08950154180908\t1/21/2022\n2023-05-12 17:02:18.257\tAMD\t116.53\t129.38297\t126.16964920278932\t1/24/2022\n2023-05-12 17:02:18.297\tAMD\t111.13\t127.29596\t123.34893153785706\t1/25/2022\n2023-05-12 17:02:18.337\tAMD\t110.71\t124.63596\t121.81300208718872\t1/26/2022\n2023-05-12 17:02:18.377\tAMD\t102.6\t121.148964\t117.3513540808258\t1/27/2022\n2023-05-12 17:02:18.397\tAMD\t105.24\t118.398964\t115.88980697813415\t1/28/2022\n2023-05-12 17:02:18.438\tAMD\t114.25\t116.13596\t117.02740685029603\t1/31/2022\n2023-05-12 17:02:18.798\tAMD\t113.18\t122.11698\t118.63108470649719\t2/11/2022\n2023-05-12 17:02:18.837\tAMD\t114.27\t122.11898\t119.52293863475036\t2/14/2022\n2023-05-12 17:02:18.877\tAMD\t121.47\t122.587975\t121.90444204803468\t2/15/2022\n2023-05-12 17:02:18.917\tAMD\t117.69\t122.08098\t120.96881196073913\t2/16/2022\n2023-05-12 17:02:18.957\tAMD\t112.37\t121.30998\t118.8707418466034\t2/17/2022\n2023-05-12 17:02:18.997\tAMD\t113.83\t120.332985\t118.83726332588195\t2/18/2022\n2023-05-12 17:02:19.037\tAMD\t115.65\t119.53098\t118.78489215644836\t2/22/2022\n2023-05-12 17:02:19.077\tAMD\t109.76\t117.68398\t116.30091001829528\t2/23/2022\n2023-05-12 17:02:19.117\tAMD\t116.61\t116.05998\t117.32894724890137\t2/24/2022\n2023-05-12 17:02:19.217\tAMD\t113.83\t116.560974\t115.68763269779969\t3/1/2022\n2023-05-12 17:02:19.297\tAMD\t111.98\t115.670975\t114.83306401434326\t3/3/2022\n2023-05-12 17:02:19.337\tAMD\t108.41\t115.27498\t113.27065586489867\t3/4/2022\n2023-05-12 17:02:19.377\tAMD\t102.95\t114.18697\t111.20060859985351\t3/7/2022\n2023-05-12 17:02:19.417\tAMD\t105.53\t113.17497\t111.32516696315002\t3/8/2022\n2023-05-12 17:02:19.457\tAMD\t111.05\t113.30398\t112.47250436457824\t3/9/2022\n2023-05-12 17:02:19.477\tAMD\t106.46\t112.28898\t111.04150824946595\t3/10/2022\n2023-05-12 17:02:19.517\tAMD\t104.29\t110.61198\t109.64469133724975\t3/11/2022\n2023-05-12 17:02:19.557\tAMD\t102.25\t108.502975\t107.84768883828735\t3/14/2022\n2023-05-12 17:02:20.057\tAMD\t109.34\t117.03097\t114.64581491485596\t3/31/2022\n2023-05-12 17:02:20.09\tAMD\t108.19\t116.50398\t114.10833685707092\t4/1/2022\n2023-05-12 17:02:20.118\tAMD\t110.53\t115.96498\t114.52911297007752\t4/4/2022\n2023-05-12 17:02:20.157\tAMD\t106.82\t115.16897\t112.94184900369264\t4/5/2022\n2023-05-12 17:02:20.197\tAMD\t103.67\t114.14397\t111.36765946870423\t4/6/2022\n2023-05-12 17:02:20.237\tAMD\t103.72\t112.46297\t110.69803062322998\t4/7/2022\n2023-05-12 17:02:20.281\tAMD\t101.0\t110.59597\t108.67356003053283\t4/8/2022\n2023-05-12 17:02:20.317\tAMD\t97.37\t108.308975\t106.22375301280212\t4/11/2022\n2023-05-12 17:02:20.337\tAMD\t95.1\t105.49597\t103.94237469464112\t4/12/2022\n2023-05-12 17:02:20.377\tAMD\t97.74\t103.34798\t102.93201633570861\t4/13/2022\n2023-05-12 17:02:20.44\tAMD\t93.06\t101.71998\t99.9469943677826\t4/14/2022\n2023-05-12 17:02:20.457\tAMD\t93.89\t100.28998\t99.13155762548827\t4/18/2022\n2023-05-12 17:02:20.497\tAMD\t96.93\t98.92998\t99.17924194436645\t4/19/2022\n2023-05-12 17:02:20.537\tAMD\t94.02\t97.64998\t97.30684477388002\t4/20/2022\n2023-05-12 17:02:20.577\tAMD\t89.85\t96.267975\t95.07147474647522\t4/21/2022\n2023-05-12 17:02:20.617\tAMD\t88.14\t94.70998\t93.58104350280762\t4/22/2022\n2023-05-12 17:02:20.658\tAMD\t90.69\t93.67897\t93.38106045533752\t4/25/2022\n2023-05-12 17:02:20.677\tAMD\t85.16\t92.45797\t90.86278607479858\t4/26/2022\n2023-05-12 17:02:20.717\tAMD\t84.91\t91.43898\t89.962775904953\t4/27/2022\n2023-05-12 17:02:20.757\tAMD\t89.64\t90.62898\t90.8442763293457\t4/28/2022\n2023-05-12 17:02:20.797\tAMD\t85.52\t89.874985\t88.94006377832031\t4/29/2022\n2023-05-12 17:02:20.837\tAMD\t89.84\t89.469986\t89.86341859066772\t5/2/2022\n2023-05-12 17:02:21.017\tAMD\t86.36\t90.11897\t89.16620219699097\t5/9/2022\n2023-05-12 17:02:21.057\tAMD\t88.73\t90.475975\t89.65980991850282\t5/10/2022\n2023-05-12 17:02:21.097\tAMD\t87.92\t90.77697\t89.63102459872437\t5/11/2022\n2023-05-12 17:02:21.137\tAMD\t87.06\t90.51897\t89.54821969577027\t5/12/2022\n2023-05-12 17:02:21.437\tAMD\t91.16\t93.94896\t92.8643238507843\t5/24/2022\n2023-05-12 17:02:21.457\tAMD\t92.65\t94.42197\t93.51955248684692\t5/25/2022\n2023-05-12 17:02:21.837\tAMD\t98.8\t103.06096\t101.24068710171508\t6/9/2022\n2023-05-12 17:02:21.877\tAMD\t94.82\t102.66795\t100.3366768076477\t6/10/2022\n2023-05-12 17:02:21.917\tAMD\t86.99\t101.14095\t97.48516254252624\t6/13/2022\n2023-05-12 17:02:21.957\tAMD\t86.99\t99.65395\t96.46295564457702\t6/14/2022\n2023-05-12 17:02:21.997\tAMD\t89.3\t98.46196\t96.23116367337036\t6/15/2022\n2023-05-12 17:02:22.017\tAMD\t82.05\t95.80795\t93.03652386915589\t6/16/2022\n2023-05-12 17:02:22.057\tAMD\t81.57\t93.33495\t91.10119544717408\t6/17/2022\n"
+          },
+          {
+            "type": "TEXT",
+            "data": "Fail to run sql command: SELECT *\r\nFROM (\r\n    SELECT \r\n    event_time,\r\n    ticker,\r\n    close_price,\r\n    sma as avg_close_price,\r\n    ((close_price - emaprev) * (2.0/11.0) + emaprev) AS ema_close_price,\r\n    `date`\r\n    FROM (\r\n        SELECT \r\n            event_time,\r\n            ticker,\r\n            close_price,\r\n            sma,\r\n            (close_price - LAG(sma, 1) OVER (ORDER BY event_time)) * (2.0/11.0) + LAG(sma, 1) OVER (ORDER BY event_time) as emaprev,\r\n            `date`\r\n        FROM (\r\n            SELECT\r\n                event_time,\r\n                ticker,\r\n                close_price,\r\n                AVG(close_price) OVER (\r\n                  PARTITION BY ticker\r\n                  ORDER BY event_time\r\n                  ROWS BETWEEN 9 PRECEDING AND CURRENT ROW\r\n                ) AS sma,\r\n                `date`\r\n            FROM stock_table\r\n        ) t\r\n    ) t1\r\n) t2\r\nWHERE close_price < ema_close_price\n"
+          },
+          {
+            "type": "ANGULAR",
+            "data": "<div class='container ng-scope' style='padding-left:0px;padding-right:0px;'>\n    <div class='panel panel-danger'>\n        <div class='panel-heading' ng-click='isOpen=!isOpen' ng-init='isOpen=false' style=\"cursor:pointer\">\n            <div class='plainTextContainer' style='font-weight:bolder'><i class=\"fa fa-caret-right fa-fw\" style=\"padding-right:7px;transition:all 0.3s;{{isOpen?'transform:rotate(90deg);transform-origin:25% 45%':''}}\"></i>Job was cancelled.</div>\n        </div>\n        <div class='panel-collapse' uib-collapse='!isOpen'>\n            <div class='text' style='max-height:300px;overflow:auto;padding:10px'>java.io.IOException: Fail to run stream sql job\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:172)\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:105)\n\tat org.apache.zeppelin.flink.FlinkStreamSqlInterpreter.callInnerSelect(FlinkStreamSqlInterpreter.java:89)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callSelect(FlinkSqlInterrpeter.java:503)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callCommand(FlinkSqlInterrpeter.java:266)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.runSqlList(FlinkSqlInterrpeter.java:160)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.internalInterpret(FlinkSqlInterrpeter.java:112)\n\tat org.apache.zeppelin.interpreter.AbstractInterpreter.interpret(AbstractInterpreter.java:47)\n\tat org.apache.zeppelin.interpreter.LazyOpenInterpreter.interpret(LazyOpenInterpreter.java:110)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:852)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:744)\n\tat org.apache.zeppelin.scheduler.Job.run(Job.java:172)\n\tat org.apache.zeppelin.scheduler.AbstractScheduler.runJob(AbstractScheduler.java:132)\n\tat org.apache.zeppelin.scheduler.ParallelScheduler.lambda$runJobInScheduler$0(ParallelScheduler.java:46)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)\n\tat java.base/java.lang.Thread.run(Thread.java:829)\nCaused by: org.apache.flink.client.program.ProgramInvocationException: Job failed (JobID: 6826597506541a72f08b26971d583f91)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:125)\n\tat java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:642)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.client.program.rest.RestClusterClient.lambda$pollResourceAsync$24(RestClusterClient.java:670)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.postFire(CompletableFuture.java:610)\n\tat java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1085)\n\tat java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:478)\n\t... 3 more\nCaused by: org.apache.flink.runtime.client.JobCancellationException: Job was cancelled.\n\tat org.apache.flink.runtime.jobmaster.JobResult.toJobExecutionResult(JobResult.java:146)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:123)\n\t... 23 more\n</div>\n        </div>\n    </div>\n</div>\n"
+          }
+        ]
+      }
+    },
+    {
+      "text": "%flink.ssql(type=update)\r\n\r\nSELECT *\r\nFROM stock_table\r\n    MATCH_RECOGNIZE(\r\n        PARTITION BY ticker\r\n        ORDER BY event_time\r\n        MEASURES\r\n            A.event_time as event_time,\r\n            FIRST(A.`date`) AS initialPriceDate,\r\n            LAST(B.`date`) AS dropDate,\r\n            (-100*(C.close_price - A.close_price)/C.close_price) AS dropPercentage,\r\n            FIRST(A.close_price) AS initialPrice,\r\n            LAST(C.close_price) AS lastPrice\r\n        ONE ROW PER MATCH\r\n        AFTER MATCH SKIP PAST LAST ROW\r\n        PATTERN (A B* C) WITHIN INTERVAL '1' MINUTE\r\n        DEFINE\r\n            B AS (B.close_price >= (A.close_price * 0.92)) AND (B.close_price <= (A.close_price * 1.08)),\r\n            C AS (-100*(C.close_price - A.close_price)/C.close_price) >= 8.0\r\n    )",
+      "user": "anonymous",
+      "dateUpdated": "2023-05-12T22:03:34+0000",
+      "progress": 0,
+      "config": {
+        "editorSetting": {
+          "language": "sql",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "colWidth": 12,
+        "editorMode": "ace/mode/sql",
+        "fontSize": 9,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "table",
+              "height": 300,
+              "optionOpen": false,
+              "setting": {
+                "table": {
+                  "tableGridState": {
+                    "columns": [
+                      {
+                        "name": "ticker0",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "event_time1",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "initialPriceDate2",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "dropDate3",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "dropPercentage4",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "initialPrice5",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "lastPrice6",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      }
+                    ],
+                    "scrollFocus": {},
+                    "selection": [],
+                    "grouping": {
+                      "grouping": [],
+                      "aggregations": [],
+                      "rowExpandedStates": {}
+                    },
+                    "treeView": {},
+                    "pagination": {
+                      "paginationCurrentPage": 1,
+                      "paginationPageSize": 250
+                    }
+                  }
+                }
+              },
+              "commonSetting": {}
+            },
+            "helium": {}
+          }
+        },
+        "enabled": true
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "FLINK JOB",
+          "tooltip": "View in Flink web UI",
+          "group": "flink",
+          "values": [
+            {
+              "jobUrl": "/flinkdashboard/#/job/e09e68d801384a1e7fc53ae758b8dd59",
+              "$$hashKey": "object:128977"
+            }
+          ],
+          "interpreterSettingId": "flink"
+        }
+      },
+      "progressUpdateIntervalMs": 500,
+      "jobName": "paragraph_1683913683369_861250669",
+      "id": "paragraph_1683913683369_861250669",
+      "dateCreated": "2023-05-12T17:48:03+0000",
+      "status": "ABORT",
+      "focus": true,
+      "$$hashKey": "object:46415",
+      "dateFinished": "2023-05-12T22:04:49+0000",
+      "dateStarted": "2023-05-12T22:03:34+0000",
+      "results": {
+        "code": "ERROR",
+        "msg": [
+          {
+            "type": "TABLE",
+            "data": "ticker\tevent_time\tinitialPriceDate\tdropDate\tdropPercentage\tinitialPrice\tlastPrice\nAMD\t2023-05-12 17:02:08.119\t1/4/2021\t2/22/2021\t8.921412\t92.3\t84.74\nAMD\t2023-05-12 17:02:09.559\t2/24/2021\t3/3/2021\t11.819939\t86.94\t77.75\nAMD\t2023-05-12 17:02:09.957\t3/11/2021\t5/11/2021\t8.829051\t81.23\t74.64\nAMD\t2023-05-12 17:02:12.817\t6/30/2021\t7/15/2021\t9.360812\t93.93\t85.89\nAMD\t2023-05-12 17:02:13.657\t8/3/2021\t8/17/2021\t8.8167\t112.56\t103.44\nAMD\t2023-05-12 17:02:14.357\t8/27/2021\t9/17/2021\t9.699654\t111.4\t101.55\nAMD\t2023-05-12 17:02:16.217\t11/8/2021\t12/8/2021\t8.7328005\t150.16\t138.1\nAMD\t2023-05-12 17:02:17.257\t12/15/2021\t1/6/2022\t10.984848\t146.5\t132.0\nAMD\t2023-05-12 17:02:17.897\t1/10/2022\t1/20/2022\t11.101762\t132.0\t118.81\nAMD\t2023-05-12 17:02:18.257\t1/24/2022\t1/26/2022\t13.576999\t116.53\t102.6\nAMD\t2023-05-12 17:02:18.597\t2/4/2022\t2/10/2022\t9.206572\t123.6\t113.18\nAMD\t2023-05-12 17:02:18.837\t2/14/2022\t3/4/2022\t10.995629\t114.27\t102.95\nAMD\t2023-05-12 17:02:19.637\t3/16/2022\t4/5/2022\t11.285815\t115.37\t103.67\nAMD\t2023-05-12 17:02:20.237\t4/7/2022\t4/11/2022\t9.064146\t103.72\t95.1\nAMD\t2023-05-12 17:02:20.377\t4/13/2022\t4/20/2022\t8.7813015\t97.74\t89.85\nAMD\t2023-05-12 17:02:20.917\t5/4/2022\t5/6/2022\t15.122739\t99.42\t86.36\nAMD\t2023-05-12 17:02:21.237\t5/17/2022\t5/19/2022\t9.593584\t102.47\t93.5\nAMD\t2023-05-12 17:02:21.537\t5/27/2022\t6/10/2022\t17.553747\t102.26\t86.99\n"
+          },
+          {
+            "type": "TEXT",
+            "data": "Fail to run sql command: SELECT *\r\nFROM stock_table\r\n    MATCH_RECOGNIZE(\r\n        PARTITION BY ticker\r\n        ORDER BY event_time\r\n        MEASURES\r\n            A.event_time as event_time,\r\n            FIRST(A.`date`) AS initialPriceDate,\r\n            LAST(B.`date`) AS dropDate,\r\n            (-100*(C.close_price - A.close_price)/C.close_price) AS dropPercentage,\r\n            FIRST(A.close_price) AS initialPrice,\r\n            LAST(C.close_price) AS lastPrice\r\n        ONE ROW PER MATCH\r\n        AFTER MATCH SKIP PAST LAST ROW\r\n        PATTERN (A B* C) WITHIN INTERVAL '1' MINUTE\r\n        DEFINE\r\n            B AS (B.close_price >= (A.close_price * 0.92)) AND (B.close_price <= (A.close_price * 1.08)),\r\n            C AS (-100*(C.close_price - A.close_price)/C.close_price) >= 8.0\r\n    )\n"
+          },
+          {
+            "type": "ANGULAR",
+            "data": "<div class='container ng-scope' style='padding-left:0px;padding-right:0px;'>\n    <div class='panel panel-danger'>\n        <div class='panel-heading' ng-click='isOpen=!isOpen' ng-init='isOpen=false' style=\"cursor:pointer\">\n            <div class='plainTextContainer' style='font-weight:bolder'><i class=\"fa fa-caret-right fa-fw\" style=\"padding-right:7px;transition:all 0.3s;{{isOpen?'transform:rotate(90deg);transform-origin:25% 45%':''}}\"></i>Job was cancelled.</div>\n        </div>\n        <div class='panel-collapse' uib-collapse='!isOpen'>\n            <div class='text' style='max-height:300px;overflow:auto;padding:10px'>java.io.IOException: Fail to run stream sql job\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:172)\n\tat org.apache.zeppelin.flink.sql.AbstractStreamSqlJob.run(AbstractStreamSqlJob.java:105)\n\tat org.apache.zeppelin.flink.FlinkStreamSqlInterpreter.callInnerSelect(FlinkStreamSqlInterpreter.java:89)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callSelect(FlinkSqlInterrpeter.java:503)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.callCommand(FlinkSqlInterrpeter.java:266)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.runSqlList(FlinkSqlInterrpeter.java:160)\n\tat org.apache.zeppelin.flink.FlinkSqlInterrpeter.internalInterpret(FlinkSqlInterrpeter.java:112)\n\tat org.apache.zeppelin.interpreter.AbstractInterpreter.interpret(AbstractInterpreter.java:47)\n\tat org.apache.zeppelin.interpreter.LazyOpenInterpreter.interpret(LazyOpenInterpreter.java:110)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:852)\n\tat org.apache.zeppelin.interpreter.remote.RemoteInterpreterServer$InterpretJob.jobRun(RemoteInterpreterServer.java:744)\n\tat org.apache.zeppelin.scheduler.Job.run(Job.java:172)\n\tat org.apache.zeppelin.scheduler.AbstractScheduler.runJob(AbstractScheduler.java:132)\n\tat org.apache.zeppelin.scheduler.ParallelScheduler.lambda$runJobInScheduler$0(ParallelScheduler.java:46)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1128)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:628)\n\tat java.base/java.lang.Thread.run(Thread.java:829)\nCaused by: org.apache.flink.client.program.ProgramInvocationException: Job failed (JobID: e09e68d801384a1e7fc53ae758b8dd59)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:125)\n\tat java.base/java.util.concurrent.CompletableFuture$UniApply.tryFire(CompletableFuture.java:642)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.client.program.rest.RestClusterClient.lambda$pollResourceAsync$24(RestClusterClient.java:670)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.complete(CompletableFuture.java:2073)\n\tat org.apache.flink.runtime.concurrent.FutureUtils.lambda$retryOperationWithDelay$9(FutureUtils.java:394)\n\tat java.base/java.util.concurrent.CompletableFuture.uniWhenComplete(CompletableFuture.java:859)\n\tat java.base/java.util.concurrent.CompletableFuture$UniWhenComplete.tryFire(CompletableFuture.java:837)\n\tat java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:506)\n\tat java.base/java.util.concurrent.CompletableFuture.postFire(CompletableFuture.java:610)\n\tat java.base/java.util.concurrent.CompletableFuture$UniCompose.tryFire(CompletableFuture.java:1085)\n\tat java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:478)\n\t... 3 more\nCaused by: org.apache.flink.runtime.client.JobCancellationException: Job was cancelled.\n\tat org.apache.flink.runtime.jobmaster.JobResult.toJobExecutionResult(JobResult.java:146)\n\tat org.apache.flink.client.deployment.ClusterClientJobClientAdapter.lambda$getJobExecutionResult$6(ClusterClientJobClientAdapter.java:123)\n\t... 23 more\n</div>\n        </div>\n    </div>\n</div>\n"
+          }
+        ]
+      }
+    }
+  ],
+  "name": "mp11v2",
+  "id": "2J12ND3NG",
+  "defaultInterpreterGroup": "flink",
+  "version": "0.9.0",
+  "noteParams": {},
+  "noteForms": {},
+  "angularObjects": {},
+  "config": {
+    "isZeppelinNotebookCronEnable": false,
+    "looknfeel": "default",
+    "personalizedMode": "false"
+  },
+  "info": {},
+  "path": "/mp11v2"
+}
